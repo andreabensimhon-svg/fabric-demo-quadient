@@ -4,8 +4,6 @@
 
 This repository contains a **hands-on technical demo** of Microsoft Fabric for **Quadient**, as part of a migration from **Cloudera** (Hadoop/Spark on-prem) to Microsoft Fabric (unified cloud data platform).
 
-The target audience is a **Data Team Lead** and a **Data Engineer** already familiar with distributed computing, Spark, orchestration tools (Oozie/Airflow), and data lake architectures.
-
 ## Demo Objectives
 
 1. **Fabric Workspace** — Understand the workspace abstraction and its components (items, roles, capacity)
