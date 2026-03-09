@@ -1,422 +1,716 @@
-# 📖 Guide des concepts Fabric — Pour débutants
+# Technical Reference Guide — Microsoft Fabric Concepts
 
-Ce guide explique **en langage simple** tous les concepts utilisés dans la démo. Il est conçu pour quelqu'un qui vient d'un univers data métier et qui n'a pas encore de bagage technique sur Azure et Fabric.
+This guide provides a **technical mapping** of Microsoft Fabric concepts for engineers migrating from Cloudera (Hadoop/Spark on-prem). It assumes familiarity with distributed systems, Spark, SQL engines, and orchestration tools.
 
 ---
 
-## Table des matières
+## Table of Contents
 
-1. [Les bases : Cloud et Azure](#1-les-bases--cloud-et-azure)
-2. [Microsoft Fabric : la vue d'ensemble](#2-microsoft-fabric--la-vue-densemble)
-3. [Le Tenant et Entra ID](#3-le-tenant-et-entra-id)
-4. [Le Workspace](#4-le-workspace)
-5. [La Capacité Fabric](#5-la-capacité-fabric)
-6. [Le Lakehouse](#6-le-lakehouse)
+1. [Azure & Cloud Fundamentals](#1-azure--cloud-fundamentals)
+2. [Microsoft Fabric Overview](#2-microsoft-fabric-overview)
+3. [Tenant & Entra ID (Identity Layer)](#3-tenant--entra-id-identity-layer)
+4. [Workspaces](#4-workspaces)
+5. [Fabric Capacity (Compute)](#5-fabric-capacity-compute)
+6. [Lakehouse](#6-lakehouse)
 7. [OneLake](#7-onelake)
-8. [Les Tables Delta](#8-les-tables-delta)
-9. [Le SQL Analytics Endpoint](#9-le-sql-analytics-endpoint)
-10. [Les Notebooks](#10-les-notebooks)
-11. [Spark : le moteur de calcul](#11-spark--le-moteur-de-calcul)
-12. [Les Data Pipelines](#12-les-data-pipelines)
-13. [Les APIs REST](#13-les-apis-rest)
-14. [Le Modèle Sémantique](#14-le-modèle-sémantique)
+8. [Delta Tables](#8-delta-tables)
+9. [SQL Analytics Endpoint](#9-sql-analytics-endpoint)
+10. [Notebooks](#10-notebooks)
+11. [Spark Runtime](#11-spark-runtime)
+12. [Data Pipelines](#12-data-pipelines)
+13. [REST APIs — Step-by-Step Guide](#13-rest-apis--step-by-step-guide)
+14. [Semantic Model](#14-semantic-model)
 15. [Semantic Link](#15-semantic-link)
-16. [La Sécurité (RLS)](#16-la-sécurité-rls)
-17. [Les Shortcuts](#17-les-shortcuts)
-18. [Glossaire rapide](#18-glossaire-rapide)
+16. [Security (RLS)](#16-security-rls)
+17. [Shortcuts](#17-shortcuts)
+18. [On-Premises Data Gateway](#18-on-premises-data-gateway)
+19. [Glossary](#19-glossary)
 
 ---
 
-## 1. Les bases : Cloud et Azure
+## 1. Azure & Cloud Fundamentals
 
-### C'est quoi le "cloud" ?
-Le cloud, ce sont des **ordinateurs très puissants** installés dans des centres de données Microsoft, partout dans le monde. Au lieu d'acheter et maintenir vos propres serveurs (on-premise), vous **louez** de la puissance de calcul et du stockage à Microsoft.
+### Azure
+**Azure** is Microsoft's hyperscale cloud platform. Fabric resources (capacities) are provisioned as Azure resources within a subscription and resource group, just like any other Azure service (Storage Accounts, AKS clusters, etc.).
 
-### C'est quoi Azure ?
-**Azure** est la plateforme cloud de Microsoft. C'est un peu comme un supermarché de services informatiques : vous y trouvez du stockage, des bases de données, de l'intelligence artificielle, et bien sûr **Microsoft Fabric**.
-
-### C'est quoi une "ressource Azure" ?
-Une ressource, c'est **quelque chose que vous avez créé** dans Azure. Par exemple :
-- Une capacité Fabric → c'est une ressource
-- Une base de données → c'est une ressource
-- Un compte de stockage → c'est une ressource
-
-Chaque ressource a un coût, un emplacement (région), et des paramètres.
+### Azure Resources
+A **resource** is any provisioned entity in Azure — a Fabric capacity, a Key Vault, a storage account. Each resource has:
+- A unique **resource ID** (`/subscriptions/{sub}/resourceGroups/{rg}/providers/...`)
+- A **region** (e.g., `westeurope`)
+- **RBAC** (Role-Based Access Control) managed via Azure IAM
 
 ---
 
-## 2. Microsoft Fabric : la vue d'ensemble
+## 2. Microsoft Fabric Overview
 
-### En une phrase
-Microsoft Fabric est une **plateforme de données tout-en-un** qui regroupe le stockage, le traitement, l'analyse et la visualisation des données.
+Microsoft Fabric is a **unified SaaS analytics platform** that consolidates:
+- **Data Lake storage** (OneLake, ADLS Gen2 backend)
+- **Spark compute** (managed Spark pools, Livy-compatible)
+- **SQL compute** (T-SQL endpoint, serverless)
+- **Orchestration** (Data Pipelines, ADF-compatible)
+- **BI** (Power BI, integrated semantic models)
 
-### Pourquoi c'est différent ?
-Avant Fabric, il fallait assembler plein de services séparés :
-- Azure Data Lake pour le stockage
-- Azure Databricks pour le traitement Spark
-- Azure Data Factory pour l'orchestration
-- Power BI pour les rapports
-- ...chacun avec sa propre facturation, sa propre sécurité, sa propre interface
+Under a single **security boundary**, **billing model** (CU-based), and **governance layer**.
 
-**Fabric regroupe tout** dans une seule interface, avec une seule sécurité et une seule facturation.
+### Cloudera → Fabric Architecture Mapping
 
-### Comparaison Cloudera → Fabric
-
-| Aspect | Cloudera (ancien monde) | Fabric (nouveau monde) |
-|--------|------------------------|----------------------|
-| Stockage | HDFS (vos serveurs) | OneLake (cloud Microsoft) |
-| Traitement | Spark sur vos machines | Spark managé |
-| SQL | Hive / Impala | SQL analytics endpoint |
-| Orchestration | Oozie / Airflow | Data Pipelines |
-| Rapports | Outils externes | Power BI intégré |
-| Administration | Ambari / Cloudera Manager | Portail Fabric |
-| Infrastructure | Vous gérez les serveurs | Microsoft gère tout |
+| Aspect | Cloudera (current) | Fabric (target) |
+|--------|----------|--------|
+| Storage | HDFS (self-managed) | OneLake (ADLS Gen2, managed) |
+| Compute (batch) | Spark on YARN | Managed Spark pools |
+| SQL / Query | Hive & Impala (ODBC) | SQL analytics endpoint (serverless) |
+| Orchestration | Oozie / Airflow | Data Pipelines (ADF-based) |
+| Catalog | Hive Metastore | Lakehouse catalog (Unity-like) |
+| BI | External tools | Power BI (native) |
+| On-prem connectivity | Direct access | On-premises Data Gateway (ODBC to Hive & Impala) |
+| Admin | Ambari / Cloudera Manager | Fabric Admin Portal + Azure Portal |
+| Infra | Self-managed cluster nodes | Fully managed (serverless) |
 
 ---
 
-## 3. Le Tenant et Entra ID
+## 3. Tenant & Entra ID (Identity Layer)
 
-### C'est quoi un "tenant" ?
-Un **tenant** (locataire en français), c'est l'**espace de votre organisation** dans le cloud Microsoft. Quand votre entreprise souscrit à Microsoft 365 ou Azure, un tenant est créé. C'est comme le **nom de domaine de votre entreprise** dans le cloud.
+### Tenant
+A **tenant** is your organization's identity boundary in Microsoft cloud. It maps to an **Entra ID directory** (formerly Azure Active Directory). All Fabric workspaces exist within a tenant.
 
-Exemple : `MngEnvMCAP183094.onmicrosoft.com` est un tenant.
+### Entra ID
+**Microsoft Entra ID** manages:
+- **User identities** (UPN-based: `user@org.onmicrosoft.com`)
+- **Groups** (security groups for RBAC)
+- **App Registrations / Service Principals** (for programmatic access — CI/CD, external orchestrators)
+- **Licenses** (Fabric, Power BI Pro/Premium Per User)
 
-### C'est quoi Entra ID ?
-**Entra ID** (anciennement Azure Active Directory / Azure AD) est le **système de gestion des identités**. C'est là que sont stockés :
-- Les **utilisateurs** (qui a un compte)
-- Les **groupes** (quelles équipes)
-- Les **licences** (qui a droit à quoi)
-- Les **permissions** (qui peut faire quoi)
-
-### Analogie
-| Monde réel | Cloud Microsoft |
-|------------|----------------|
-| Le bâtiment de votre entreprise | Le tenant |
-| Le service des badges | Entra ID |
-| Le badge d'un employé | Le compte utilisateur |
-| L'étage autorisé | Les permissions |
+### Key Points for Automation
+- **Service Principals** (App Registrations) are the recommended auth method for non-interactive workloads (scripts, pipelines, CI/CD)
+- **Managed Identities** are not yet supported for Fabric APIs
+- **Guest accounts** (`#EXT#`) have limited capabilities in Fabric — prefer native tenant accounts
 
 ---
 
-## 4. Le Workspace
+## 4. Workspaces
 
-### C'est quoi ?
-Un **workspace** (espace de travail) est un **conteneur** dans Fabric où vous rangez tous vos éléments de travail : données, notebooks, pipelines, rapports.
+A **workspace** is the top-level container in Fabric. All items (Lakehouses, Notebooks, Pipelines, Reports) live inside a workspace.
 
-### Analogie
-Pensez à un **dossier de projet partagé** :
-- Le workspace = le dossier
-- Les items (Lakehouse, Notebook...) = les fichiers dans le dossier
-- Les rôles = les permissions sur le dossier
+### Access Roles
 
-### Les rôles
+| Role | Read | Write | Share | Admin |
+|------|------|-------|-------|-------|
+| **Viewer** | Yes | No | No | No |
+| **Contributor** | Yes | Yes | No | No |
+| **Member** | Yes | Yes | Yes | No |
+| **Admin** | Yes | Yes | Yes | Yes |
 
-| Rôle | En gros... |
-|------|-----------|
-| **Viewer** | Peut regarder, ne peut rien toucher |
-| **Contributor** | Peut modifier le contenu existant |
-| **Member** | Peut modifier et partager |
-| **Admin** | Peut tout faire, y compris supprimer |
+- Roles are assigned to **users, groups, or service principals**
+- Workspace roles are **additive** (a Member has all Contributor permissions plus sharing)
+- Equivalent to Ranger policies scoping access at the namespace level
 
 ---
 
-## 5. La Capacité Fabric
+## 5. Fabric Capacity (Compute)
 
-### C'est quoi ?
-La **capacité** c'est le **moteur** qui fait tourner vos traitements. C'est un peu comme louer une voiture :
-- Petite capacité (F2) = petite voiture (pour les tests)
-- Grande capacité (F64) = gros 4x4 (pour la production)
+A **capacity** is the compute engine (CU = Capacity Units) attached to one or more workspaces. It's provisioned as an Azure resource.
 
-### Comment ça marche ?
-- Vous créez une capacité dans Azure (c'est une **ressource Azure**)
-- Vous l'associez à un ou plusieurs workspaces
-- Tous les utilisateurs du workspace bénéficient de cette puissance
-- Vous payez en fonction de la taille choisie
+| SKU | CUs | Typical Use |
+|-----|-----|-------------|
+| F2 | 2 | Dev / PoC |
+| F8 | 8 | Small team |
+| F64 | 64 | Production |
+| F128+ | 128+ | Enterprise |
 
-### Important
-- La capacité est attachée **au workspace**, pas aux utilisateurs
-- Si vous mettez la capacité en pause → les workspaces ne fonctionnent plus
-- Vous pouvez changer la taille à tout moment
+- All users in a workspace share the capacity
+- Capacity can be **paused** (cost stops, workspaces become read-only)
+- Capacity can be **scaled** up/down without downtime
+- Spark, SQL, and Pipeline workloads all consume CUs from the same pool (with burst)
 
 ---
 
-## 6. Le Lakehouse
+## 6. Lakehouse
 
-### C'est quoi ?
-Le **Lakehouse** est l'endroit où vous **stockez vos données**. C'est la fusion de deux concepts :
-- **Data Lake** (lac de données) = stockage brut de fichiers
-- **Data Warehouse** (entrepôt de données) = données structurées en tables
+The **Lakehouse** merges the data lake (raw files) and the data warehouse (structured tables) into a single artifact.
 
-### Les deux zones
-
+### Structure
 ```
-Mon Lakehouse
-├── Tables/     ← Données structurées, requêtables en SQL
-│   ├── clients
-│   └── commandes
-└── Files/      ← Fichiers bruts (CSV, JSON, images...)
-    ├── imports/
+demolakehouse/
+├── Tables/          ← Delta tables (managed, queryable via Spark & SQL)
+│   ├── ventes_demo
+│   └── produits_demo
+└── Files/           ← Raw files (CSV, JSON, Parquet, images...)
+    ├── raw/
+    ├── staging/
     └── exports/
 ```
 
-### Analogie
-| Zone | C'est comme... |
-|------|---------------|
-| **Tables/** | Un classeur Excel avec des tableaux bien rangés |
-| **Files/** | Un disque dur avec des fichiers en vrac |
+| Zone | Purpose | Cloudera Equivalent |
+|------|---------|---------------------|
+| `Tables/` | Managed Delta tables, schema-enforced, SQL-queryable | Hive / Impala managed tables |
+| `Files/` | Unstructured/raw file storage | HDFS directories |
+
+- `Tables/` are automatically registered in the Lakehouse catalog and exposed via the SQL analytics endpoint
+- `Files/` are accessible via `abfss://` paths or Spark's `Files/` relative path
 
 ---
 
 ## 7. OneLake
 
-### C'est quoi ?
-**OneLake** est le **système de stockage** qui se cache derrière tous les Lakehouses. C'est un data lake unique pour tout votre tenant (toute votre organisation).
+**OneLake** is the unified storage layer for the entire Fabric tenant. It's backed by **ADLS Gen2** and uses the `abfss://` protocol.
 
-### Pourquoi c'est important ?
-- **Un seul endroit** pour toutes les données de l'organisation
-- Accessible par **tous les workspaces** (avec les bonnes permissions)
-- Pas besoin de copier les données d'un endroit à l'autre (on utilise des **shortcuts**)
+| HDFS / Hive / Impala (Cloudera) | OneLake (Fabric) |
+|-----------------|------------------|
+| One HDFS per cluster | One OneLake per tenant |
+| `hdfs://namenode/path` | `abfss://workspace@onelake.dfs.fabric.microsoft.com/lakehouse.Lakehouse/...` |
+| Hive/Impala tables via ODBC | Delta tables via SQL endpoint or Spark |
+| Manual replication (factor 3) | Managed replication (GRS/ZRS) |
+| No format enforcement | Delta Lake by default for tables |
 
-### Analogie
-Si les Lakehouses sont des **tiroirs**, OneLake est la **grande armoire** qui contient tous les tiroirs.
-
----
-
-## 8. Les Tables Delta
-
-### C'est quoi Delta ?
-**Delta Lake** est un **format de stockage** de données open-source créé par Databricks. Dans Fabric, toutes les tables sont au format Delta.
-
-### Pourquoi c'est mieux qu'un fichier CSV ?
-
-| CSV classique | Table Delta |
-|---------------|------------|
-| Pas de schéma (colonnes libres) | Schéma défini (colonnes typées) |
-| Pas de transactions | Transactions ACID (pas de données corrompues) |
-| Pas de versioning | Historique des modifications (time travel) |
-| Lecture séquentielle | Lecture optimisée (predicate pushdown) |
-| Pas de mise à jour partielle | UPDATE, DELETE, MERGE possibles |
-
-### En pratique
-Vous n'avez pas besoin de "penser Delta" au quotidien. Quand vous faites `df.write.saveAsTable("ma_table")`, la table est automatiquement créée en Delta.
+### Key Features
+- **Cross-workspace access** via shortcuts (no data copying)
+- **Compatible** with any ADLS Gen2 client (Azure Storage Explorer, `azcopy`, Spark `abfss://`)
+- **OneLake File Explorer** (Windows app) for local file system integration
+- **On-premises Data Gateway** support for hybrid connectivity to Hive & Impala via ODBC
 
 ---
 
-## 9. Le SQL Analytics Endpoint
+## 8. Delta Tables
 
-### C'est quoi ?
-C'est une **couche SQL** automatiquement créée au-dessus de votre Lakehouse. Elle permet de **requêter vos tables avec du SQL** sans démarrer Spark.
+All Lakehouse tables use the **Delta Lake** format (open-source, originally from Databricks).
 
-### Pourquoi c'est utile ?
-- **Instantané** : pas besoin d'attendre le démarrage de Spark (30s-1min)
-- **SQL standard** : `SELECT * FROM ma_table WHERE ville = 'Paris'`
-- **Parfait pour** : les analyses rapides, les rapports Power BI, les vérifications
+### Why Delta over raw Parquet/CSV
 
-### Limitation
-C'est en **lecture seule**. Vous ne pouvez pas modifier les données via le SQL endpoint. Pour écrire, il faut passer par Spark (notebooks).
+| Feature | CSV / Parquet | Delta Lake |
+|---------|---------------|------------|
+| ACID Transactions | No | Yes |
+| Schema enforcement | No (Parquet partial) | Yes |
+| Time travel / versioning | No | Yes (`VERSION AS OF`) |
+| UPDATE / DELETE / MERGE | No | Yes |
+| Predicate pushdown | Parquet only | Yes (Z-ordering, data skipping) |
+| Concurrent writes | Unsafe | Safe (optimistic concurrency) |
 
----
-
-## 10. Les Notebooks
-
-### C'est quoi ?
-Un **notebook** est un document interactif qui mélange :
-- Du **texte explicatif** (en Markdown)
-- Du **code exécutable** (Python, SQL, Scala, R)
-- Des **résultats** (tableaux, graphiques)
-
-### Analogie
-C'est comme un **document Word** dans lequel vous pouvez aussi **exécuter du code** et voir les résultats immédiatement.
-
-### Les langages disponibles
-
-| Langage | Quand l'utiliser |
-|---------|-----------------|
-| **PySpark (Python)** | Traitement de données, ETL, ML — le plus courant |
-| **Spark SQL** | Requêtes SQL sur les tables |
-| **Scala** | Performance critique (rare) |
-| **R** | Statistiques avancées (rare) |
-
-### Comment ça se passe ?
-1. Vous écrivez du code dans une **cellule**
-2. Vous cliquez sur ▶ (Play)
-3. Le code s'exécute dans le cloud (pas sur votre PC !)
-4. Le résultat s'affiche sous la cellule
+In practice, `df.write.format("delta").saveAsTable("my_table")` is the standard write pattern. The Lakehouse catalog handles registration automatically.
 
 ---
 
-## 11. Spark : le moteur de calcul
+## 9. SQL Analytics Endpoint
 
-### C'est quoi Spark ?
-**Apache Spark** est un **moteur de calcul distribué**. En gros, il découpe votre travail en petits morceaux et les exécute en parallèle sur plusieurs machines.
+Each Lakehouse auto-generates a **SQL analytics endpoint** — a serverless T-SQL interface for **read-only queries** over Delta tables.
 
-### Pourquoi c'est puissant ?
-- **Un fichier de 10 Go** : Excel plante. Spark le traite en quelques secondes.
-- **Une requête sur 1 milliard de lignes** : SQL classique rame. Spark distribue le calcul.
+| Spark (Notebook) | SQL Analytics Endpoint |
+|-------------------|------------------------|
+| Read + Write | Read-only |
+| Spark startup ~30–60s | Instant |
+| PySpark / SparkSQL | T-SQL |
+| CU: Spark pool | CU: SQL pool |
 
-### Bonne nouvelle pour Quadient
-Vous utilisez déjà Spark sur Cloudera ! Le code Spark est **le même** dans Fabric. La seule différence : vous n'avez plus à gérer les machines.
-
-### Le `spark` dans le code
-Quand vous voyez `spark.sql(...)` ou `spark.read.csv(...)` dans un notebook, `spark` est l'objet qui représente votre connexion au moteur Spark. Il est pré-configuré automatiquement dans les notebooks Fabric.
+- Equivalent to **Impala** (ODBC) or **Hive LLAP** in Cloudera — Quadient currently uses both via ODBC through the Data Gateway
+- Supports standard T-SQL syntax: `SELECT`, `JOIN`, `GROUP BY`, window functions
+- This is where **RLS** (Row-Level Security) can be configured
+- Power BI reports typically connect to the SQL endpoint or the semantic model
 
 ---
 
-## 12. Les Data Pipelines
+## 10. Notebooks
 
-### C'est quoi ?
-Un **Data Pipeline** est un enchaînement d'étapes automatisées pour traiter vos données. C'est l'équivalent d'Oozie ou Airflow.
+Fabric Notebooks are **Jupyter-compatible** notebooks with:
+- **Languages**: PySpark (default), SparkSQL (`%%sql` magic), Scala, R
+- **Built-in Spark session**: `spark` object is pre-configured — no cluster provisioning needed
+- **`mssparkutils`**: Fabric-specific utility library (credentials, file system, notebook orchestration)
+- **Lakehouse attachment**: Notebooks mount a Lakehouse, making its tables available as `spark.sql("SELECT * FROM my_table")`
 
-### Exemple concret
+### Key Difference from Cloudera
+- No `spark-submit`, no YARN queue config, no resource negotiation
+- Just open the notebook and run — Spark pool spins up automatically
+- Session startup: ~30–60s (first cell), then instant
+
+---
+
+## 11. Spark Runtime
+
+Fabric uses **managed Apache Spark pools** (Spark 3.4+ as of 2025).
+
+- **Same Spark API** as Cloudera — `DataFrame`, `SparkSQL`, `spark.read`, `spark.write` all work identically
+- **No cluster management**: no YARN, no node sizing, no driver/executor config (auto-tuned)
+- **Libraries**: pre-installed runtime includes pandas, numpy, scikit-learn, semantic-link, plotly, etc. Custom libraries can be added per workspace or per notebook session
+- **Livy compatible**: Spark jobs can be submitted via Livy REST endpoint
+
+---
+
+## 12. Data Pipelines
+
+**Data Pipelines** are Fabric's orchestration engine, based on Azure Data Factory (ADF).
+
+### Available Activities
+
+| Activity | Purpose | Cloudera Equivalent |
+|----------|---------|---------------------|
+| **Notebook** | Run a Spark notebook | Spark Action (Oozie) |
+| **Copy Data** | Source → Destination bulk copy | DistCp / Sqoop |
+| **Dataflow Gen2** | Visual ETL (Power Query) | N/A |
+| **Script** | Run T-SQL | Hive Action |
+| **Web** | HTTP call (invoke external API) | Shell Action (curl) |
+| **ForEach** | Loop over array | Fork/Join |
+| **If Condition** | Conditional branching | Decision node |
+| **Set Variable** | Store runtime values | Oozie parameters |
+| **Fail** | Force pipeline failure | Kill node |
+
+### Triggers
+
+| Trigger Type | Description | Cloudera Equivalent |
+|-------------|-------------|---------------------|
+| Manual | On-demand (UI click or API call) | `oozie job -run` |
+| Scheduled | Cron-like (hourly, daily, etc.) | Coordinator / cron |
+| Tumbling Window | Fixed-size time windows | N/A |
+| Event-based | File arrival in OneLake | N/A (required custom dev) |
+
+### How to Create a Pipeline (Click-by-Click)
+1. In your workspace → **+ New** → **Data Pipeline**
+2. Name it (e.g., `pipeline-daily-etl`)
+3. Drag activities from the toolbar onto the canvas
+4. Connect them with **success** (green), **failure** (red), or **completion** (blue) arrows
+5. Configure each activity (select notebook, set parameters, etc.)
+6. Click **Schedule** to set a trigger, or **Run** for manual execution
+
+---
+
+## 13. REST APIs — Step-by-Step Guide
+
+This section provides a **complete, click-by-click walkthrough** of the Fabric REST APIs — how to authenticate, what endpoints to call, and how to integrate with external systems.
+
+### 13.1 What are Fabric REST APIs?
+
+Fabric exposes a full REST API at `https://api.fabric.microsoft.com` that lets you **programmatically manage** workspaces, items, and job execution. Use cases:
+- Trigger notebook/pipeline runs from **Jenkins**, **GitHub Actions**, or **Airflow**
+- Enumerate workspace items for **inventory/governance scripts**
+- Automate Lakehouse creation, item provisioning, or capacity management
+
+### 13.2 Authentication — Two Methods
+
+| Method | When to Use | How |
+|--------|-------------|-----|
+| **User Identity** (interactive) | Testing from a Fabric notebook | `mssparkutils.credentials.getToken("https://api.fabric.microsoft.com")` |
+| **Service Principal** (non-interactive) | Production scripts, CI/CD, external orchestrators | App Registration in Entra ID + client secret/certificate |
+
+#### Option A: User Identity (for testing in Fabric Notebooks)
+
+This is the simplest method. Inside a Fabric notebook:
+```python
+token = mssparkutils.credentials.getToken("https://api.fabric.microsoft.com")
+headers = {"Authorization": f"Bearer {token}"}
 ```
-Matin 6h00 (automatique) :
-  Étape 1 : Copier les nouveaux fichiers depuis le FTP du client
-  Étape 2 : Lancer le notebook de nettoyage des données
-  Étape 3 : Mettre à jour les tables du Lakehouse
-  Étape 4 : Rafraîchir le rapport Power BI
-  Étape 5 : Envoyer un email de confirmation
+No additional setup required — uses the identity of the logged-in user.
+
+#### Option B: Service Principal (for production)
+
+**Step-by-step setup in Azure Portal:**
+
+1. **Create an App Registration**
+   - Go to [Azure Portal](https://portal.azure.com) → **Microsoft Entra ID** → **App registrations** → **+ New registration**
+   - Name: e.g., `fabric-api-quadient`
+   - Supported account types: "Accounts in this organizational directory only"
+   - Click **Register**
+
+2. **Create a Client Secret**
+   - In the App Registration → **Certificates & secrets** → **+ New client secret**
+   - Description: e.g., `fabric-api-key`
+   - Expiration: choose appropriately (6 months, 12 months, 24 months)
+   - **Copy the secret value** immediately (it won't be shown again)
+
+3. **Note the App Details**
+   - **Application (client) ID**: found on the app's Overview page
+   - **Directory (tenant) ID**: found on the app's Overview page
+   - **Client Secret**: the value you copied in step 2
+
+4. **Enable Service Principal Access in Fabric**
+   - Go to [Fabric Admin Portal](https://app.fabric.microsoft.com/admin-portal) → **Tenant settings**
+   - Search for: **"Service principals can use Fabric APIs"**
+   - Enable it → Apply to **the entire organization** or a specific **security group**
+   - Also enable: **"Service principals can access read-only admin APIs"** (if needed)
+
+5. **Grant Workspace Access**
+   - Go to your workspace in Fabric → **Manage access** (top right)
+   - **+ Add people or groups** → Paste the App Registration name → Assign **Contributor** or **Member** role
+
+6. **Acquire a Token Programmatically**
+   ```python
+   import requests
+
+   tenant_id = "<your-tenant-id>"
+   client_id = "<your-client-id>"
+   client_secret = "<your-client-secret>"
+
+   token_url = f"https://login.microsoftonline.com/{tenant_id}/oauth2/v2.0/token"
+   token_payload = {
+       "grant_type": "client_credentials",
+       "client_id": client_id,
+       "client_secret": client_secret,
+       "scope": "https://api.fabric.microsoft.com/.default"
+   }
+
+   response = requests.post(token_url, data=token_payload)
+   token = response.json()["access_token"]
+   headers = {"Authorization": f"Bearer {token}"}
+   ```
+
+### 13.3 API Walkthrough — Common Operations
+
+All endpoints use base URL: `https://api.fabric.microsoft.com`
+
+#### List Workspaces
+```
+GET /v1/workspaces
+Authorization: Bearer {token}
+```
+Returns an array of workspaces the authenticated identity has access to.
+
+#### List Items in a Workspace
+```
+GET /v1/workspaces/{workspaceId}/items
+Authorization: Bearer {token}
+```
+Returns all items (Lakehouses, Notebooks, Pipelines, Semantic Models, etc.) with their `id`, `displayName`, and `type`.
+
+#### Trigger a Notebook Run
+```
+POST /v1/workspaces/{workspaceId}/items/{notebookId}/jobs/instances?jobType=RunNotebook
+Authorization: Bearer {token}
+```
+- Returns `202 Accepted` with a `Location` header containing the job monitoring URL
+- The notebook runs asynchronously
+
+#### Trigger a Pipeline Run
+```
+POST /v1/workspaces/{workspaceId}/items/{pipelineId}/jobs/instances?jobType=Pipeline
+Authorization: Bearer {token}
+```
+- Same pattern as notebook: `202 Accepted` + `Location` header
+
+#### Monitor Job Status
+```
+GET /v1/workspaces/{workspaceId}/items/{itemId}/jobs/instances/{jobInstanceId}
+Authorization: Bearer {token}
+```
+Returns job status: `NotStarted`, `InProgress`, `Completed`, `Failed`, `Cancelled`.
+
+#### Create an Item
+```
+POST /v1/workspaces/{workspaceId}/items
+Authorization: Bearer {token}
+Content-Type: application/json
+
+{
+  "displayName": "my-new-lakehouse",
+  "type": "Lakehouse"
+}
 ```
 
-### Comment ça se crée ?
-C'est du **drag & drop** ! Vous glissez des blocs (activités) et vous les reliez avec des flèches. Pas besoin d'écrire du XML (comme Oozie) ou du Python (comme Airflow).
+### 13.4 Quick Reference Table
+
+| Action | Method | Endpoint | Cloudera Equivalent |
+|--------|--------|----------|---------------------|
+| List workspaces | `GET` | `/v1/workspaces` | N/A |
+| List items | `GET` | `/v1/workspaces/{id}/items` | `hdfs dfs -ls` |
+| Run Notebook | `POST` | `.../items/{id}/jobs/instances?jobType=RunNotebook` | `spark-submit` |
+| Run Pipeline | `POST` | `.../items/{id}/jobs/instances?jobType=Pipeline` | `oozie job -run` |
+| Monitor Job | `GET` | `.../items/{id}/jobs/instances/{runId}` | `oozie job -info` |
+| Upload file | `PUT` | OneLake API (ADLS Gen2 compatible) | `hdfs dfs -put` |
+| Create item | `POST` | `/v1/workspaces/{id}/items` | N/A |
+| Refresh semantic model | `POST` | `.../items/{id}/jobs/instances?jobType=RefreshDataset` | N/A |
+
+**Full API documentation**: https://learn.microsoft.com/en-us/rest/api/fabric/core/
+
+### 13.5 Practical Integration Scenarios
+
+#### Scenario 1: External Airflow triggers Fabric
+```python
+# In your Airflow DAG (PythonOperator)
+def trigger_fabric_notebook(**context):
+    token = get_fabric_token()  # Service Principal auth
+    url = f"https://api.fabric.microsoft.com/v1/workspaces/{WS_ID}/items/{NB_ID}/jobs/instances?jobType=RunNotebook"
+    resp = requests.post(url, headers={"Authorization": f"Bearer {token}"})
+    job_url = resp.headers["Location"]
+    # Poll job_url until status == "Completed"
+```
+
+#### Scenario 2: GitHub Actions CI/CD
+```yaml
+# .github/workflows/run-notebook.yml
+- name: Trigger Fabric Notebook
+  run: |
+    TOKEN=$(curl -s -X POST "https://login.microsoftonline.com/$TENANT_ID/oauth2/v2.0/token" \
+      -d "grant_type=client_credentials&client_id=$CLIENT_ID&client_secret=$CLIENT_SECRET&scope=https://api.fabric.microsoft.com/.default" \
+      | jq -r '.access_token')
+    curl -X POST "https://api.fabric.microsoft.com/v1/workspaces/$WS_ID/items/$NB_ID/jobs/instances?jobType=RunNotebook" \
+      -H "Authorization: Bearer $TOKEN"
+```
+
+#### Scenario 3: Progressive Cloudera Migration
+```
+Phase 1 (Now):     Existing Airflow/Oozie → calls Fabric REST APIs
+Phase 2 (Migrate): Recreate workflows as native Fabric Data Pipelines
+Phase 3 (Target):  Full Fabric: Data Pipelines + Notebooks, no external orchestrator
+```
 
 ---
 
-## 13. Les APIs REST
+## 14. Semantic Model
 
-### C'est quoi une API ?
-Une **API** (Application Programming Interface) c'est une **interface pour les machines**. Au lieu de cliquer dans une interface graphique, un programme envoie des commandes.
+A **semantic model** (formerly "dataset" in Power BI) is a business logic layer on top of your Lakehouse data. It's the interface between raw Delta tables and consumers (Power BI reports, Semantic Link in notebooks, Excel pivot tables).
 
-### C'est quoi REST ?
-**REST** est un standard pour les APIs web. Ça utilise les mêmes protocoles que votre navigateur (HTTP).
+### What It Contains
 
-### Analogie
-| Action humaine | API REST |
-|----------------|---------|
-| Aller sur un site web | `GET https://api.fabric.microsoft.com/workspaces` |
-| Remplir un formulaire et cliquer "Envoyer" | `POST https://api.fabric.microsoft.com/jobs` |
-| Regarder le statut d'une commande | `GET https://api.fabric.microsoft.com/jobs/123/status` |
+| Component | Description | Example |
+|-----------|-------------|---------|
+| **Tables** | Mapped from Lakehouse Delta tables | `ventes_demo`, `produits_demo` |
+| **Relationships** | Foreign key definitions between tables | `ventes_demo[ProduitId]` → `produits_demo[Id]` |
+| **Measures** | DAX expressions — reusable business logic | `Total Revenue := SUM(ventes_demo[CA])` |
+| **Calculated columns** | Row-level DAX computations | `Margin := [CA] - [Cost]` |
+| **Hierarchies** | Drill-down paths for reports | Year → Quarter → Month |
+| **RLS roles** | Row-level security rules | "France" role filters `Filiale = "France"` |
 
-### Pourquoi c'est utile ?
-- Automatiser des tâches répétitives
-- Intégrer Fabric avec d'autres systèmes (Jenkins, Airflow, systèmes métier)
-- Déclencher des traitements depuis un script
+### Default vs Custom Semantic Model
 
-### Le Token d'authentification
-Pour utiliser une API, il faut un **token** (jeton d'authentification). C'est un long texte crypté qui prouve votre identité. C'est comme scanner votre badge avant d'entrer dans un bâtiment sécurisé.
+| | Default (auto-generated) | Custom |
+|--|--------------------------|--------|
+| **Created when** | Lakehouse is created | You click "New semantic model" |
+| **Name** | Same as Lakehouse (`demolakehouse`) | Any name you choose |
+| **Tables** | All Lakehouse tables auto-included | You select which tables to include |
+| **Measures** | None (just raw tables) | You define DAX measures |
+| **Relationships** | Auto-detected (best effort) | You define explicitly |
+| **When to use** | Quick exploration, Semantic Link tests | Production reports, governed KPIs |
 
----
+### How to Find the Default Semantic Model (Click-by-Click)
 
-## 14. Le Modèle Sémantique
+1. Go to your workspace `demo-quadient` in Fabric
+2. Look for an item named **`demolakehouse`** with a **bar chart icon** (type: Semantic model)
+3. If it's not visible:
+   - Open the Lakehouse `demolakehouse`
+   - Click the dropdown in the top-right → switch to **SQL analytics endpoint**
+   - Go back to the workspace view — the default model should now appear
+4. If still missing: Lakehouse → **New semantic model** → select tables → Save
 
-### C'est quoi ?
-Un **modèle sémantique** (semantic model) est une **couche métier** au-dessus de vos données. Il transforme vos tables brutes en quelque chose de compréhensible pour le métier.
+### How to Add Measures and Relationships (Click-by-Click)
 
-### Ce qu'il contient
-- **Tables** : les données source
-- **Relations** : comment les tables sont liées (ex: Commandes → Clients)
-- **Mesures** : les calculs métier (ex: CA = SUM(montant), Marge = CA - Coûts)
-- **Hiérarchies** : les niveaux d'analyse (ex: Année → Trimestre → Mois)
+**Adding a Measure:**
+1. Open the semantic model `demolakehouse` in your workspace
+2. Switch to the **Model view** (bottom-left icon, or top tab)
+3. Select a table (e.g., `ventes_demo`)
+4. In the formula bar at the top, click **New measure**
+5. Type the DAX expression:
+   ```dax
+   Total CA := SUM(ventes_demo[CA])
+   ```
+6. Press **Enter** — the measure appears under the table
+7. Repeat for other KPIs:
+   ```dax
+   Avg CA := AVERAGE(ventes_demo[CA])
+   CA France := CALCULATE(SUM(ventes_demo[CA]), ventes_demo[Filiale] = "France")
+   ```
 
-### Analogie
-| Données brutes | Modèle sémantique |
-|----------------|-------------------|
-| Tas de LEGO en vrac | Notice + modèle assemblé |
-| Chiffres incompréhensibles | KPIs métier clairs |
-| `SUM(col_ht * (1 + col_tva_pct/100))` | "CA TTC" |
+**Adding a Relationship:**
+1. In **Model view**, you see all tables as boxes
+2. Drag a column from one table to a matching column in another (e.g., `ventes_demo[ProduitId]` → `produits_demo[Id]`)
+3. The relationship dialog appears — confirm cardinality (`Many-to-One`) and cross-filter direction
+4. Click **OK**
 
-### En pratique
-Quand vous créez un Lakehouse, un **modèle sémantique par défaut** est automatiquement créé. Il contient les tables de votre Lakehouse. Vous pouvez ensuite y ajouter des mesures et des relations.
+### How to Refresh the Semantic Model
+
+The default semantic model auto-syncs with Lakehouse tables (schema changes propagate). For **data refresh**:
+
+| Method | How |
+|--------|-----|
+| **Manual** | Open model → **Refresh now** button (top bar) |
+| **Scheduled** | Model settings → **Scheduled refresh** → set frequency |
+| **Via API** | `POST .../items/{modelId}/jobs/instances?jobType=RefreshDataset` |
+| **Via Pipeline** | Add a **"Refresh semantic model"** activity in a Data Pipeline |
+
+### Connection to Power BI Reports
+
+```
+Lakehouse (Delta tables)
+    ↓ auto-sync
+Semantic Model (measures, relationships, RLS)
+    ↓ live connection
+Power BI Report (visuals, dashboards)
+```
+
+- Reports connect to the **semantic model**, not directly to the Lakehouse
+- Any measure defined in the model is available in Power BI visuals
+- RLS defined in the model is enforced for all report consumers
+- **One model can serve multiple reports**
+
+> **Important**: For Notebook 04, the semantic model name is **`demolakehouse`** (matching the Lakehouse name).
 
 ---
 
 ## 15. Semantic Link
 
-### C'est quoi ?
-**Semantic Link** est une librairie Python qui fait le pont entre les **notebooks** (monde data engineering) et les **modèles sémantiques** (monde Power BI).
+**Semantic Link** (`sempy`) is a Python library (pre-installed in Fabric) that bridges **PySpark notebooks** and **Power BI semantic models**.
 
-### En 3 mots
-Lire les données Power BI depuis Python.
-
-### Les 3 fonctions à retenir
+### Core Functions
 
 ```python
 import sempy.fabric as fabric
 
-# 1. Voir les modèles disponibles
+# List all semantic models in the current workspace
 fabric.list_datasets()
 
-# 2. Charger une table dans un DataFrame
-df = fabric.read_table("mon_modele", "ma_table")
+# List tables in a specific model
+fabric.list_tables("demolakehouse")
 
-# 3. Exécuter une requête DAX
-result = fabric.evaluate_dax("mon_modele", "EVALUATE ma_requete")
+# Load a table into a Pandas DataFrame
+df = fabric.read_table("demolakehouse", "ventes_demo")
+
+# Execute a DAX query
+result = fabric.evaluate_dax("demolakehouse", "EVALUATE SUMMARIZE(...)")
+
+# List measures defined in the model
+fabric.list_measures("demolakehouse")
 ```
 
----
-
-## 16. La Sécurité (RLS)
-
-### C'est quoi la RLS ?
-**Row-Level Security** (sécurité au niveau de la ligne) = chaque utilisateur ne voit que **les lignes qui le concernent**.
-
-### Exemple
-La table `ventes` contient des données de 3 filiales :
-
-| Sans RLS | Avec RLS (connecté en tant que "France") |
-|----------|------------------------------------------|
-| Voit les 3 filiales | Ne voit que les lignes "France" |
-
-### Limitation actuelle dans Fabric
-- ✅ La RLS fonctionne via le **SQL analytics endpoint**
-- ✅ La RLS fonctionne via le **modèle sémantique** (Power BI)
-- ❌ La RLS **ne fonctionne PAS** via Spark / OneLake shortcuts (erreur 403)
+### Use Cases
+- Data scientists reuse BI-curated data without duplicating ETL logic
+- DAX measures are evaluated server-side (respects RLS)
+- Feed ML pipelines with business-ready data
 
 ---
 
-## 17. Les Shortcuts
+## 16. Security (RLS)
 
-### C'est quoi ?
-Un **shortcut** (raccourci) est un **lien** vers des données stockées ailleurs, **sans les copier**.
+**Row-Level Security** restricts data visibility at the row level based on the user's identity.
 
-### Analogie
-C'est comme un **raccourci Windows** : quand vous double-cliquez dessus, ça ouvre le fichier original. Le fichier n'est pas dupliqué.
+### Current Fabric Support
 
-### Pourquoi c'est utile pour Quadient ?
-Avec des filiales multiples, on veut :
-- Stocker les données **une seule fois** (dans un Lakehouse source)
-- Donner accès à chaque filiale **sans copier** les données
-- Les shortcuts permettent ça
+| Access Method | RLS Enforced? |
+|--------------|---------------|
+| SQL Analytics Endpoint | Yes |
+| Semantic Model (Power BI) | Yes |
+| Spark / Notebooks | **No** |
+| OneLake Shortcuts (Spark) | **No** (returns 403) |
 
----
+RLS is configured via T-SQL on the SQL analytics endpoint:
+```sql
+CREATE FUNCTION dbo.fn_rls_filter(@region NVARCHAR(50))
+RETURNS TABLE
+WITH SCHEMABINDING
+AS
+    RETURN SELECT 1 AS result WHERE @region = USER_NAME();
 
-## 18. Glossaire rapide
+CREATE SECURITY POLICY rls_policy
+ADD FILTER PREDICATE dbo.fn_rls_filter(Region) ON dbo.ventes_demo;
+```
 
-| Terme | Définition simple |
-|-------|-------------------|
-| **Azure** | Le cloud de Microsoft |
-| **Tenant** | L'espace de votre organisation dans le cloud |
-| **Entra ID** | Le système de gestion des utilisateurs et permissions |
-| **Fabric** | La plateforme de données tout-en-un de Microsoft |
-| **Workspace** | Un dossier de projet partagé dans Fabric |
-| **Capacité** | Le moteur (puissance de calcul) |
-| **Lakehouse** | Stockage de données (tables + fichiers) |
-| **OneLake** | Le data lake unique derrière tous les Lakehouses |
-| **Delta** | Le format de stockage des tables (open-source) |
-| **SQL Endpoint** | Couche SQL en lecture sur le Lakehouse |
-| **Notebook** | Document interactif code + texte |
-| **Spark** | Moteur de calcul distribué (même que sur Cloudera) |
-| **Pipeline** | Orchestration automatisée de tâches |
-| **API REST** | Interface pour contrôler Fabric par code |
-| **Modèle sémantique** | Couche métier (tables + mesures + relations) |
-| **Semantic Link** | Librairie Python pour lire les données Power BI |
-| **RLS** | Sécurité au niveau de la ligne (qui voit quoi) |
-| **Shortcut** | Lien vers des données sans copie |
-| **DAX** | Langage de requête Power BI |
-| **PySpark** | Python + Spark (le langage principal des notebooks) |
-| **Token** | Jeton d'authentification pour les APIs |
-| **Service Principal** | Un "robot" avec un compte pour automatiser |
+> **Known limitation**: RLS does not propagate through Spark/OneLake shortcuts. This is a recognized Fabric product gap.
 
 ---
 
-*Ce guide fait partie du projet [fabric-demo-quadient](../README.md).*
+## 17. Shortcuts
+
+A **shortcut** is a pointer to data in another Lakehouse or external storage — no data copy, no duplication.
+
+### Supported Sources
+- **OneLake** (another Lakehouse in the same or different workspace)
+- **ADLS Gen2** (external Azure storage)
+- **AWS S3** (cross-cloud)
+- **Google Cloud Storage** (cross-cloud)
+
+### How to Create a Shortcut (Click-by-Click)
+1. Open the target Lakehouse in Fabric
+2. Right-click on **Tables** (or **Files**) → **New shortcut**
+3. Select the source type (e.g., **Microsoft OneLake**)
+4. Browse to the source Lakehouse → select the table or folder
+5. Confirm → the shortcut appears instantly
+
+Analogous to `ln -s` (symlink) in Linux — but over distributed cloud storage.
+
+---
+
+## 18. On-Premises Data Gateway
+
+The **on-premises data gateway** is a bridge between Microsoft Fabric (cloud) and data sources behind a corporate VPN/firewall (on-prem).
+
+### Current Status at Quadient
+
+| Component | Status |
+|-----------|--------|
+| Gateway installation | Operational |
+| ODBC connection to **Hive** | Working |
+| ODBC connection to **Impala** | Working |
+| Data refresh in Power BI / Fabric | Verified |
+| Network (VPN/firewall) | On-prem data securely accessible |
+
+### How It Works
+
+```
+On-Prem (behind VPN)              Cloud (Fabric)
+┌──────────────────┐              ┌──────────────────┐
+│  Cloudera Cluster │              │  Fabric Workspace │
+│  ├── Hive (ODBC) │◄────────────►│  ├── Lakehouse    │
+│  └── Impala(ODBC)│  Data Gateway│  ├── Pipeline     │
+└──────────────────┘              │  └── Power BI     │
+                                  └──────────────────┘
+```
+
+1. The **gateway agent** runs on a Windows server inside the corporate network
+2. It establishes an **outbound HTTPS** connection to Azure Service Bus (no inbound firewall rule needed)
+3. Fabric sends queries through this tunnel → gateway executes them against Hive/Impala via ODBC → results flow back
+4. Supports **scheduled refresh** (Power BI datasets, Dataflow Gen2) and **live connections**
+
+### Key Considerations
+
+| Topic | Detail |
+|-------|--------|
+| **Authentication** | Gateway uses the configured ODBC DSN credentials (Kerberos or username/password) |
+| **Performance** | Data travels through the gateway — for large volumes, consider migrating data to OneLake instead |
+| **High availability** | Multiple gateway instances can form a cluster for failover |
+| **Monitoring** | Gateway logs available in Windows Event Viewer + Fabric Admin Portal |
+| **Hybrid pattern** | Use the gateway for incremental/live access during migration; target full OneLake for steady-state |
+
+### Step-by-Step: Configure a Hive/Impala Connection in Fabric
+
+1. **Install the gateway** on a Windows server with network access to Cloudera
+2. **Install ODBC drivers** (Cloudera Hive ODBC / Impala ODBC) on the gateway machine
+3. **Create a system DSN** (ODBC Data Source Administrator → System DSN → Add → configure host, port, auth)
+4. **Register the gateway** in Fabric: Settings → Manage connections and gateways → + New → On-premises
+5. **Create a connection**: Select gateway cluster → ODBC data source type → enter DSN name + credentials
+6. **Use in Pipeline or Dataflow**: In a Copy Data activity or Dataflow Gen2, select the gateway connection as source
+7. **Test refresh**: Trigger a manual refresh to validate end-to-end connectivity
+
+### Next Steps
+- Review workspace usage, potentially via a new clean Fabric workspace
+- Explore triggering Fabric workflows via REST APIs or file-based events (see [Section 13](#13-rest-apis--step-by-step-guide))
+- Plan progressive migration: gateway (hybrid) → full OneLake (target state)
+
+---
+
+## 19. Glossary
+
+| Term | Definition |
+|------|-----------|
+| **Azure** | Microsoft's cloud platform |
+| **Tenant** | Organization's identity boundary in Microsoft cloud |
+| **Entra ID** | Identity & access management (formerly Azure AD) |
+| **Fabric** | Unified SaaS analytics platform |
+| **Workspace** | Top-level container for all Fabric items |
+| **Capacity** | Compute engine (CU-based), attached to workspaces |
+| **Lakehouse** | Unified storage: Delta tables + raw files |
+| **OneLake** | Tenant-wide data lake (ADLS Gen2 backend) |
+| **Delta Lake** | Open-source table format (ACID, versioning, schema enforcement) |
+| **SQL Endpoint** | Serverless T-SQL read-only layer over Lakehouse tables |
+| **Notebook** | Interactive Jupyter-compatible code + markdown document |
+| **Spark** | Distributed compute engine (managed pools in Fabric) |
+| **Pipeline** | Visual orchestration workflow (ADF-based) |
+| **REST API** | Programmatic interface to manage Fabric resources |
+| **Semantic Model** | Business logic layer (tables + measures + relationships) |
+| **Semantic Link** | Python library (`sempy`) bridging notebooks ↔ Power BI |
+| **RLS** | Row-Level Security (row-level data filtering by identity) |
+| **Shortcut** | Pointer to remote data without copying |
+| **DAX** | Data Analysis Expressions (Power BI query language) |
+| **PySpark** | Python API for Apache Spark |
+| **Token** | OAuth2 bearer token for API authentication |
+| **Service Principal** | Non-interactive identity (App Registration) for automation |
+| **mssparkutils** | Fabric-specific utility library in notebooks |
+| **CU** | Capacity Unit (compute billing unit in Fabric) |
+| **Data Gateway** | On-premises bridge for accessing data behind VPN/firewall from Fabric |
+| **ODBC** | Open Database Connectivity — standard driver interface for Hive/Impala access |
+
+---
+
+*This guide is part of the [fabric-demo-quadient](../README.md) project.*

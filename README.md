@@ -1,69 +1,97 @@
-# 🏭 Fabric Demo — Migration Cloudera → Microsoft Fabric
+# Fabric Demo — Cloudera to Microsoft Fabric Migration
 
-## Contexte
+## Context
 
-Ce projet contient une **démo complète** de Microsoft Fabric à destination du client **Quadient**, dans le cadre d'une migration depuis **Cloudera** (Hadoop/Spark on-prem) vers Microsoft Fabric (plateforme data cloud unifiée).
+This repository contains a **hands-on technical demo** of Microsoft Fabric for **Quadient**, as part of a migration from **Cloudera** (Hadoop/Spark on-prem) to Microsoft Fabric (unified cloud data platform).
 
-## Objectifs de la démo
+The target audience is a **Data Team Lead** and a **Data Engineer** already familiar with distributed computing, Spark, orchestration tools (Oozie/Airflow), and data lake architectures.
 
-1. **Présenter le Workspace Fabric** — comprendre l'environnement de travail et ses composants
-2. **Découvrir le Lakehouse & OneLake** — le stockage unifié qui remplace HDFS + Hive
-3. **Déclencher des workflows via APIs** — automatiser les traitements (remplacement d'Oozie/Airflow)
-4. **Semantic Link** — interroger les modèles sémantiques depuis un notebook Python
+## Demo Objectives
 
-## Structure du projet
+1. **Fabric Workspace** — Understand the workspace abstraction and its components (items, roles, capacity)
+2. **Lakehouse & OneLake** — Unified storage layer replacing Hive + Impala on-prem
+3. **Data Pipelines & REST APIs** — Orchestration and programmatic automation (replacing Oozie/Airflow), with **step-by-step API walkthrough**
+4. **Semantic Link** — Query Power BI semantic models from a PySpark notebook
+
+## Repository Structure
 
 ```
 fabric-demo-quadient/
-├── README.md                          ← Ce fichier
-├── .gitignore
+├── README.md                          ← This file
 ├── docs/
-│   └── guide-concepts-debutant.md     ← Guide des concepts Fabric pour débutants
+│   └── guide-concepts-debutant.md     ← Technical reference guide: Fabric concepts
 └── notebooks/
-    ├── 01-decouverte-workspace.ipynb   ← Notebook 1 : Découverte du workspace Fabric
-    ├── 02-lakehouse-onelake.ipynb      ← Notebook 2 : Lakehouse, tables Delta, OneLake
-    ├── 03-pipelines-apis.ipynb         ← Notebook 3 : Data Pipelines & APIs REST Fabric
-    └── 04-semantic-link.ipynb          ← Notebook 4 : Semantic Link (bonus)
+    ├── 01-decouverte-workspace.ipynb   ← Notebook 1: Workspace discovery & Spark environment
+    ├── 02-lakehouse-onelake.ipynb      ← Notebook 2: Lakehouse, Delta tables, OneLake
+    ├── 03-pipelines-apis.ipynb         ← Notebook 3: Data Pipelines & Fabric REST APIs
+    └── 04-semantic-link.ipynb          ← Notebook 4: Semantic Link (read semantic models from Python)
 ```
 
-## Correspondance Cloudera → Fabric
+## Cloudera → Fabric Mapping
 
-| Composant Cloudera | Équivalent Fabric | Notebook |
+| Cloudera Component | Fabric Equivalent | Notebook |
 |--------------------|-------------------|----------|
-| Cluster Hadoop | Workspace Fabric | 01 |
-| HDFS | OneLake | 02 |
-| Hive Metastore | Lakehouse (Tables Delta) | 02 |
-| Spark Submit / Zeppelin | Notebook Fabric (PySpark) | 01, 02 |
-| Oozie / Airflow | Data Pipeline | 03 |
-| API Oozie | API REST Fabric | 03 |
-| Ranger / Sentry | RLS + Workspace Roles | 02 |
-| N/A | Semantic Link | 04 |
+| Hadoop Cluster | Fabric Workspace + Capacity | 01 |
+| Hive / Impala (on-prem, ODBC) | Lakehouse + SQL analytics endpoint | 02 |
+| Hive Metastore | Lakehouse catalog (Delta tables, Unity-like) | 02 |
+| Spark Submit / Zeppelin | Fabric Notebook (PySpark, managed Spark pools) | 01, 02 |
+| Oozie / Airflow | Data Pipeline (visual orchestrator) | 03 |
+| Oozie REST API | Fabric REST API (`api.fabric.microsoft.com`) | 03 |
+| Ranger / Sentry | Workspace Roles + RLS (SQL endpoint) | 02 |
+| On-prem data (VPN/firewall) | On-premises Data Gateway (ODBC) | — |
+| N/A | Semantic Link (Python ↔ Power BI bridge) | 04 |
 
-## Pré-requis
+## Prerequisites
 
-- Un **tenant Microsoft Fabric** avec une capacité active (F2 minimum pour les tests)
-- Un compte utilisateur avec le rôle **Member** ou **Admin** sur un workspace
-- Un navigateur web (Edge ou Chrome recommandé)
-- Pour le notebook 04 : la librairie `semantic-link` (pré-installée dans Fabric)
+- A **Microsoft Fabric tenant** with an active capacity (F2 minimum for testing)
+- A user account with **Member** or **Admin** role on a workspace
+- A web browser (Edge or Chrome)
+- For Notebook 04: the `semantic-link` library (pre-installed in Fabric runtime)
 
-## Comment utiliser cette démo
+## Environment Details
 
-1. **Lire le guide des concepts** : commencez par [docs/guide-concepts-debutant.md](docs/guide-concepts-debutant.md) si vous êtes nouveau sur Fabric
-2. **Importer les notebooks dans Fabric** : dans votre workspace, cliquez sur `+ Nouveau` → `Importer un notebook` → sélectionnez les fichiers `.ipynb`
-3. **Exécuter les notebooks dans l'ordre** : 01 → 02 → 03 → 04
-4. **Chaque notebook contient des explications** en markdown + du code exécutable
+| Parameter | Value |
+|-----------|-------|
+| Workspace name | `demo-quadient` |
+| Lakehouse name | `demolakehouse` |
+| Default semantic model | `demolakehouse` (auto-created with Lakehouse) |
+| On-premises Data Gateway | Installed & operational |
+| ODBC connections | Hive & Impala (working, data refresh verified) |
+| On-prem network | Accessible behind VPN/firewall |
 
-## Déroulé recommandé pour la démo (30 min)
+## How to Use This Demo
 
-| Temps | Sujet | Support |
-|-------|-------|---------|
-| 0-2 min | Introduction, contexte migration | Oral |
-| 2-10 min | Workspace Fabric (parallèle Cloudera) | Notebook 01 + live |
-| 10-17 min | Lakehouse & OneLake en détail | Notebook 02 + live |
-| 17-25 min | Data Pipelines & APIs REST | Notebook 03 + live |
-| 25-28 min | Semantic Link (bonus) | Notebook 04 |
-| 28-30 min | Q&A | — |
+1. **Read the technical reference**: start with [docs/guide-concepts-debutant.md](docs/guide-concepts-debutant.md) for a mapping of Fabric concepts
+2. **Import notebooks into Fabric**: In your workspace → `+ New` → `Import notebook` → select the `.ipynb` files
+3. **Attach the Lakehouse**: In each notebook, attach `demolakehouse` from the left panel
+4. **Run notebooks in order**: 01 → 02 → 03 → 04
+5. **Each notebook** contains markdown explanations + executable code cells
 
-## Auteur
+## Recommended Demo Flow (30 min)
 
-Demo préparée par l'équipe Microsoft — Solution Engineering
+| Time | Topic | Material |
+|------|-------|----------|
+| 0–2 min | Introduction, migration context | Oral |
+| 2–10 min | Fabric Workspace (Cloudera parallel) | Notebook 01 + live walkthrough |
+| 10–17 min | Lakehouse & OneLake deep-dive | Notebook 02 + live walkthrough |
+| 17–25 min | Data Pipelines & REST APIs (step-by-step) | Notebook 03 + live walkthrough |
+| 25–28 min | Semantic Link | Notebook 04 |
+| 28–30 min | Q&A | — |
+
+## Key Technical Details for the API Section
+
+The API walkthrough in Notebook 03 covers:
+- **Token acquisition** using `mssparkutils.credentials.getToken()` (user identity flow)
+- **Workspace enumeration** via `GET /v1/workspaces`
+- **Item listing** via `GET /v1/workspaces/{id}/items`
+- **Notebook execution** via `POST .../jobs/instances?jobType=RunNotebook`
+- **Pipeline execution** via `POST .../jobs/instances?jobType=Pipeline`
+- **Job monitoring** via `GET .../jobs/instances/{runId}`
+
+For production use, see the guide on setting up a **Service Principal** (App Registration in Entra ID) for automated, non-interactive authentication.
+
+Full API reference: https://learn.microsoft.com/en-us/rest/api/fabric/core/
+
+## Author
+
+Demo prepared by the Microsoft Solution Engineering team.
